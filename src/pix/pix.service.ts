@@ -1,6 +1,7 @@
 import { HttpService } from '@nestjs/axios';
 import { Injectable } from '@nestjs/common';
 import { transformPixValidateKeyFactory } from '../utils/transformPixValidateKeyFactory';
+import { IBalance } from './interfaces/balance.interface';
 import { ICustomer, ICustomerBank } from './interfaces/customer.interface';
 import { ITransaction } from './interfaces/transaction.interface';
 
@@ -13,24 +14,28 @@ export class PixService {
 
     const pendingTransactions = await this.getAllContingencyTransaction();
 
-    const preparedToSendTransaction = pendingTransactions.map((transaction) => {
-      const customer = customersList.find(
-        (customer) => customer.customerID === transaction.customerID,
-      );
+    const balance = await this.getBalance();
 
-      const key = transformPixValidateKeyFactory(transaction.key);
+    const preparedToSendTransaction = pendingTransactions
+      .map((transaction) => {
+        const customer = customersList.find(
+          (customer) => customer.customerID === transaction.customerID,
+        );
 
-      return {
-        transaction: {
-          ...transaction,
-          key: key,
-          bank: {
-            agency: customer.agency,
-            account: customer.account,
+        const key = transformPixValidateKeyFactory(transaction.key);
+
+        return {
+          transaction: {
+            ...transaction,
+            key: key,
+            bank: {
+              agency: customer.agency,
+              account: customer.account,
+            },
           },
-        },
-      };
-    });
+        };
+      })
+      .filter((transaction) => transaction.transaction.value < balance);
 
     return { preparedToSendTransaction };
   }
@@ -61,5 +66,16 @@ export class PixService {
     );
 
     return customersList;
+  }
+
+  async getBalance(): Promise<number> {
+    const { data } = await this.httpService
+      .get<IBalance>(
+        'https://run.mocky.io/v3/e0f453b7-620c-4479-839e-28ac58111fca',
+      )
+      .toPromise();
+    console.log(data.balance);
+
+    return data.balance;
   }
 }
