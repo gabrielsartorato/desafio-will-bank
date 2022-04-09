@@ -42,13 +42,11 @@ export class PixService {
 
             if (transaction.value < balance) {
               return {
-                transaction: {
-                  ...transaction,
-                  key: key,
-                  bank: {
-                    agency: customer.agency,
-                    account: customer.account,
-                  },
+                ...transaction,
+                key: key,
+                bank: {
+                  agency: customer.agency,
+                  account: customer.account,
                 },
               };
             }
@@ -57,11 +55,15 @@ export class PixService {
       );
 
       const preparedToSendTransactions = transFormTransaction.filter(
-        (tran) => tran,
+        (transaction) => transaction,
       );
 
-      return { preparedToSendTransactions };
+      return preparedToSendTransactions;
     } catch (error) {
+      if (error instanceof HttpException) {
+        throw new HttpException({ message: error.message }, error.getStatus());
+      }
+
       throw new HttpException(
         'Transações não realizadas devido erro interno.',
         HttpStatus.INTERNAL_SERVER_ERROR,
