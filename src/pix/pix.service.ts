@@ -1,5 +1,6 @@
 import { HttpService } from '@nestjs/axios';
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { transformPixValidateKeyFactory } from '../utils/transformPixValidateKeyFactory';
 import { IBalance } from './interfaces/balance.interface';
 import { ICustomer, ICustomerBank } from './interfaces/customer.interface';
@@ -9,6 +10,45 @@ import { ITransaction } from './interfaces/transaction.interface';
 export class PixService {
   constructor(private readonly httpService: HttpService) {}
 
+  async getAllContingencyTransaction(): Promise<ITransaction[]> {
+    const { data: transactions } = await this.httpService
+      .get<ITransaction[]>(
+        'https://run.mocky.io/v3/c3bdfbf6-d789-4e52-829c-bddbb886c3be',
+      )
+      .toPromise();
+
+    return transactions;
+  }
+
+  async getAllBanksAndClients(): Promise<ICustomer[]> {
+    const { data } = await this.httpService
+      .get<ICustomerBank[]>(
+        'https://run.mocky.io/v3/85c286b6-e483-420f-9f2b-1ca57ae06c52',
+      )
+      .toPromise();
+
+    const customersList: ICustomer[] = [];
+
+    data.map((bandkAndCustomers) =>
+      bandkAndCustomers.customers.map((customer) =>
+        customersList.push(customer),
+      ),
+    );
+
+    return customersList;
+  }
+
+  async getBalance(): Promise<number> {
+    const { data } = await this.httpService
+      .get<IBalance>(
+        'https://run.mocky.io/v3/e0f453b7-620c-4479-839e-28ac58111fca',
+      )
+      .toPromise();
+
+    return data.balance;
+  }
+
+  @Cron(CronExpression.EVERY_5_MINUTES)
   async resendContingencyList() {
     try {
       const customersList = await this.getAllBanksAndClients();
@@ -58,8 +98,12 @@ export class PixService {
         (transaction) => transaction,
       );
 
+      console.log(preparedToSendTransactions);
+
       return preparedToSendTransactions;
     } catch (error) {
+      Logger.error(error.message);
+
       if (error instanceof HttpException) {
         throw new HttpException({ message: error.message }, error.getStatus());
       }
@@ -69,43 +113,5 @@ export class PixService {
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
-  }
-
-  async getAllContingencyTransaction(): Promise<ITransaction[]> {
-    const { data: transactions } = await this.httpService
-      .get<ITransaction[]>(
-        'https://run.mocky.io/v3/c3bdfbf6-d789-4e52-829c-bddbb886c3be',
-      )
-      .toPromise();
-
-    return transactions;
-  }
-
-  async getAllBanksAndClients(): Promise<ICustomer[]> {
-    const { data } = await this.httpService
-      .get<ICustomerBank[]>(
-        'https://run.mocky.io/v3/85c286b6-e483-420f-9f2b-1ca57ae06c52',
-      )
-      .toPromise();
-
-    const customersList: ICustomer[] = [];
-
-    data.map((bandkAndCustomers) =>
-      bandkAndCustomers.customers.map((customer) =>
-        customersList.push(customer),
-      ),
-    );
-
-    return customersList;
-  }
-
-  async getBalance(): Promise<number> {
-    const { data } = await this.httpService
-      .get<IBalance>(
-        'https://run.mocky.io/v3/e0f453b7-620c-4479-839e-28ac58111fca',
-      )
-      .toPromise();
-
-    return data.balance;
   }
 }
